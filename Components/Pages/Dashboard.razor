@@ -1,0 +1,207 @@
+﻿@page "/dashboard"
+@using System.Collections.Generic
+
+<head>
+    <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+
+<div class="dashboard-container">
+    <!-- Welcome Section -->
+    <div class="welcome-section">
+        <h1>Welcome Back, John! 👋</h1>
+        <p>Here are your recently viewed files</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background-color: rgba(31, 126, 58, 0.1); color: #1f7e3a;">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+                <p class="stat-label">Total You Documents</p>
+                <h3>42</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Files Section -->
+    <div class="recent-section">
+        <div class="section-header">
+            <h2>📁 Recently Viewed</h2>
+            <a href="/documents" class="view-all-btn">View All</a>
+        </div>
+
+        <div class="files-grid">
+            @foreach (var file in recentFiles)
+            {
+                <div class="file-card" @onmouseenter="@(() => ActiveFileId = file.Id)" @onmouseleave="@(() => ActiveFileId = null)">
+                    <!-- File Icon & Basic Info -->
+                    <div class="card-header">
+                        <div class="file-icon" style="background-color: @GetFileColor(file.Type)">
+                            @GetFileIcon(file.Type)
+                        </div>
+                        <div class="file-meta">
+                            <h4 class="file-name">@file.Name</h4>
+                            <p class="file-details">@file.Size | @file.Modified</p>
+                        </div>
+                    </div>
+
+                    <!-- File Preview/Thumbnail -->
+                    <div class="file-preview">
+                        @if (file.Type == "image")
+                        {
+                            <img src="@file.ThumbnailUrl" alt="@file.Name" class="preview-img" />
+                        }
+                        else
+                        {
+                            <div class="preview-placeholder">
+                                <span class="preview-type">@file.Type.ToUpper()</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- File Info -->
+                    <div class="file-info">
+                        <div class="info-row">
+                            <span class="info-label">Owner:</span>
+                            <span class="info-value">@file.Owner</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Location:</span>
+                            <span class="info-value">@file.Location</span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons (Show on Hover) -->
+                    @if (ActiveFileId == file.Id)
+                    {
+                        <div class="file-actions">
+                            <button class="action-btn open-btn" @onclick="@(() => HandleOpenFile(file))" title="Open">
+                                <i class="fas fa-arrow-up-right-from-square"></i>
+                            </button>
+                            <button class="action-btn download-btn" @onclick="@(() => HandleDownloadFile(file))" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="action-btn share-btn" @onclick="@(() => HandleShareFile(file))" title="Share">
+                                <i class="fas fa-share"></i>
+                            </button>
+                            <button class="action-btn more-btn" @onclick="@(() => ToggleFileMenu(file.Id))" title="More">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+   
+</div>
+
+@code {
+    private List<FileModel> recentFiles = new();
+    private List<FileModel> quickAccessFiles = new();
+    private List<ActivityModel> recentActivity = new();
+    private int? ActiveFileId = null;
+
+    protected override void OnInitialized()
+    {
+        // Sample recent files
+        recentFiles = new List<FileModel>
+        {
+            new() { Id = 1, Name = "Annual Report 2025.pdf", Type = "pdf", Size = "2.4 MB", Modified = "2 days ago", Owner = "You", Location = "Reports", ThumbnailUrl = "" },
+            new() { Id = 2, Name = "Project Proposal.docx", Type = "word", Size = "1.2 MB", Modified = "5 days ago", Owner = "You", Location = "Projects", ThumbnailUrl = "" },
+            new() { Id = 3, Name = "Budget Analysis.xlsx", Type = "excel", Size = "856 KB", Modified = "1 week ago", Owner = "You", Location = "Finance", ThumbnailUrl = "" },
+            new() { Id = 4, Name = "Presentation Q2.pptx", Type = "powerpoint", Size = "3.1 MB", Modified = "3 days ago", Owner = "You", Location = "Presentations", ThumbnailUrl = "" },
+            new() { Id = 5, Name = "Company Logo.png", Type = "image", Size = "245 KB", Modified = "2 weeks ago", Owner = "You", Location = "Assets", ThumbnailUrl = "https://via.placeholder.com/200" },
+            new() { Id = 6, Name = "Contract Draft.pdf", Type = "pdf", Size = "512 KB", Modified = "6 days ago", Owner = "You", Location = "Legal", ThumbnailUrl = "" }
+        };
+
+        // Quick access files (pinned)
+        quickAccessFiles = new List<FileModel>
+        {
+            new() { Id = 1, Name = "Annual Report", Type = "pdf", Size = "2.4 MB", ThumbnailUrl = "" },
+            new() { Id = 2, Name = "Q2 Proposal", Type = "word", Size = "1.2 MB", ThumbnailUrl = "" },
+            new() { Id = 3, Name = "Budget", Type = "excel", Size = "856 KB", ThumbnailUrl = "" },
+            new() { Id = 4, Name = "Presentation", Type = "powerpoint", Size = "3.1 MB", ThumbnailUrl = "" }
+        };
+
+        // Recent activity
+        recentActivity = new List<ActivityModel>
+        {
+            new() { Id = 1, User = "You", Action = "viewed", FileName = "Annual Report 2025.pdf", Time = "2 hours ago", Type = "view" },
+            new() { Id = 2, User = "John Doe", Action = "shared", FileName = "Project Proposal.docx", Time = "4 hours ago", Type = "share" },
+            new() { Id = 3, User = "You", Action = "downloaded", FileName = "Budget Analysis.xlsx", Time = "1 day ago", Type = "download" },
+            new() { Id = 4, User = "Jane Smith", Action = "uploaded", FileName = "Meeting Notes.pdf", Time = "2 days ago", Type = "upload" },
+            new() { Id = 5, User = "You", Action = "edited", FileName = "Contract Draft.pdf", Time = "3 days ago", Type = "edit" }
+        };
+    }
+
+    private void HandleOpenFile(FileModel file) => Console.WriteLine($"Opening: {file.Name}");
+    private void HandleDownloadFile(FileModel file) => Console.WriteLine($"Downloading: {file.Name}");
+    private void HandleShareFile(FileModel file) => Console.WriteLine($"Sharing: {file.Name}");
+    private void ToggleFileMenu(int id) => Console.WriteLine($"Menu for file: {id}");
+
+    private string GetFileIcon(string type) => type switch
+    {
+        "pdf" => "📄",
+        "word" => "📝",
+        "excel" => "📊",
+        "powerpoint" => "🎨",
+        "image" => "🖼️",
+        _ => "📁"
+    };
+
+    private string GetFileColor(string type) => type switch
+    {
+        "pdf" => "#d32f2f",
+        "word" => "#2196F3",
+        "excel" => "#1f7e3a",
+        "powerpoint" => "#f57c00",
+        "image" => "#9c27b0",
+        _ => "#666666"
+    };
+
+    private string GetActivityIcon(string type) => type switch
+    {
+        "view" => "👁️",
+        "download" => "⬇️",
+        "upload" => "⬆️",
+        "share" => "🔗",
+        "edit" => "✏️",
+        _ => "📌"
+    };
+
+    private string GetActivityColor(string type) => type switch
+    {
+        "view" => "rgba(31, 126, 58, 0.1)",
+        "download" => "rgba(33, 150, 243, 0.1)",
+        "upload" => "rgba(245, 124, 0, 0.1)",
+        "share" => "rgba(156, 39, 176, 0.1)",
+        "edit" => "rgba(255, 152, 0, 0.1)",
+        _ => "rgba(100, 100, 100, 0.1)"
+    };
+
+    public class FileModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string Size { get; set; }
+        public string Modified { get; set; }
+        public string Owner { get; set; }
+        public string Location { get; set; }
+        public string ThumbnailUrl { get; set; }
+    }
+
+    public class ActivityModel
+    {
+        public int Id { get; set; }
+        public string User { get; set; }
+        public string Action { get; set; }
+        public string FileName { get; set; }
+        public string Time { get; set; }
+        public string Type { get; set; }
+    }
+}

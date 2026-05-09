@@ -1,0 +1,500 @@
+﻿@page "/upload-documents"
+@using System.Collections.Generic
+
+<head>
+    <link rel="stylesheet" href="css/upload-documents.css" />
+</head>
+
+<div class="upload-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>📤 Upload Documents</h1>
+        <p>Upload files and organize them in folders</p>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="upload-layout">
+        <!-- Left Sidebar - Folder Navigation -->
+        <aside class="folder-sidebar">
+            <div class="sidebar-header">
+                <h3>📁 Folders</h3>
+                <button class="btn-new-folder" @onclick="@(() => ShowNewFolderModal())" title="Create Folder">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+
+            <div class="folder-list">
+                @foreach (var folder in folderList)
+                {
+                    <div class="folder-item @(selectedFolderId == folder.Id ? "active" : "")" @onclick="@(() => SelectFolder(folder.Id))">
+                        <i class="fas fa-folder"></i>
+                        <span class="folder-name">@folder.Name</span>
+                        <span class="folder-count">@folder.FileCount</span>
+                    </div>
+                }
+            </div>
+
+            <div class="sidebar-footer">
+                <p class="storage-label">Storage Used</p>
+                <div class="storage-bar">
+                    <div class="storage-progress" style="width: @storagePercentage%"></div>
+                </div>
+                <p class="storage-text">@usedStorage GB / @totalStorage GB</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="upload-content">
+            <!-- File Path Display -->
+            <div class="file-path-container">
+                <div class="path-header">
+                    <h4>📍 File Path</h4>
+                    <button class="copy-path-btn" @onclick="@(() => CopyPathToClipboard())" title="Copy path">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="file-path-display">
+                    <div class="path-breadcrumb">
+                        <span class="path-item root">
+                            <i class="fas fa-folder-open"></i>
+                            Documents
+                        </span>
+                        @if (selectedFolderId != null)
+                        {
+                            <span class="path-separator">\</span>
+                            @foreach (var pathFolder in currentPath)
+                            {
+                                <span class="path-item" @onclick="@(() => SelectFolder(pathFolder.Id))">
+                                    <i class="fas fa-folder"></i>
+                                    @pathFolder.Name
+                                </span>
+                                @if (pathFolder.Id != currentPath.Last().Id)
+                                {
+                                    <span class="path-separator">\</span>
+                                }
+                            }
+                        }
+                    </div>
+                    <div class="path-text">
+                        <code>@GetFullPath()</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Folder Breadcrumb -->
+            <div class="breadcrumb">
+                <button @onclick="@(() => SelectFolder(null))" class="breadcrumb-item">
+                    <i class="fas fa-home"></i> Home
+                </button>
+                @if (selectedFolderId != null)
+                {
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="breadcrumb-item active">
+                        @selectedFolderName
+                    </span>
+                }
+            </div>
+
+            <!-- Upload Area -->
+            <div class="upload-area" @ondrop="@HandleFileDrop" @ondragover="@HandleDragOver" @ondragleave="@HandleDragLeave">
+                <div class="upload-content-inner">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h3>Drag and drop files here</h3>
+                    <p>or</p>
+                    <label for="file-input" class="upload-btn">
+                        <i class="fas fa-folder-open"></i> Choose Files
+                    </label>
+                    <input type="file" id="file-input" multiple @onchange="@HandleFileSelect" style="display: none;" />
+                    <p class="upload-info">
+                        Supported formats: PDF, DOCX, XLSX, PPTX, PNG, JPG, GIF
+                        <br />Max file size: 50 MB each
+                    </p>
+                    @if (selectedFolderId != null)
+                    {
+                        <div class="upload-destination">
+                            <p class="destination-text">
+                                <i class="fas fa-map-pin"></i> Files will be uploaded to: <strong>@GetFullPath()</strong>
+                            </p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Category Selection -->
+            <div class="category-section">
+                <h3>📂 Select Category (Optional)</h3>
+                <div class="category-buttons">
+                    @foreach (var category in categories)
+                    {
+                        <button class="category-btn @(selectedCategory == category ? "active" : "")"
+                                @onclick="@(() => SelectCategory(category))">
+                            @GetCategoryIcon(category) @category
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Uploads Section -->
+            <div class="recent-uploads-section">
+                <div class="section-header">
+                    <h2>📋 Recent Uploads</h2>
+                    <select class="sort-dropdown" @onchange="@((ChangeEventArgs e) => ChangeSortOrder(e.Value?.ToString()))">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="name">Name (A-Z)</option>
+                        <option value="size">Size (Largest)</option>
+                    </select>
+                </div>
+
+                <!-- Upload Status (if uploading) -->
+                @if (uploadingFiles.Count > 0)
+                {
+                    <div class="upload-progress-section">
+                        @foreach (var uploadFile in uploadingFiles)
+                        {
+                            <div class="upload-progress-item">
+                                <div class="progress-info">
+                                    <p class="progress-filename">@uploadFile.Name</p>
+                                    <p class="progress-status">@uploadFile.Status</p>
+                                    <p class="progress-path">
+                                        <i class="fas fa-folder-open"></i> @uploadFile.UploadPath
+                                    </p>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: @uploadFile.Progress%"></div>
+                                </div>
+                                <p class="progress-percentage">@uploadFile.Progress%</p>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Uploaded Files List -->
+                <div class="files-list">
+                    @if (recentUploads.Count == 0)
+                    {
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No files uploaded yet</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var file in recentUploads)
+                        {
+                            <div class="file-item" @onmouseenter="@(() => ActiveFileId = file.Id)" @onmouseleave="@(() => ActiveFileId = null)">
+                                <div class="file-left">
+                                    <div class="file-icon" style="background-color: @GetFileColor(file.Type)">
+                                        @GetFileIcon(file.Type)
+                                    </div>
+                                    <div class="file-details">
+                                        <h4 class="file-name">@file.Name</h4>
+                                        <p class="file-meta">@file.Size | @file.UploadedDate | @file.Category</p>
+                                        <p class="file-path">
+                                            <i class="fas fa-folder-open"></i> @file.FilePath
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="file-status">
+                                    @if (file.Status == "completed")
+                                    {
+                                        <span class="status-badge success">
+                                            <i class="fas fa-check-circle"></i> Completed
+                                        </span>
+                                    }
+                                    else if (file.Status == "processing")
+                                    {
+                                        <span class="status-badge processing">
+                                            <i class="fas fa-spinner"></i> Processing
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge error">
+                                            <i class="fas fa-times-circle"></i> Failed
+                                        </span>
+                                    }
+                                </div>
+
+                                @if (ActiveFileId == file.Id)
+                                {
+                                    <div class="file-actions">
+                                        <button class="action-btn" title="Download" @onclick="@(() => HandleDownloadFile(file))">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <button class="action-btn" title="Share" @onclick="@(() => HandleShareFile(file))">
+                                            <i class="fas fa-share"></i>
+                                        </button>
+                                        <button class="action-btn" title="Copy Path" @onclick="@(() => CopyFilePath(file.FilePath))">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                        <button class="action-btn delete" title="Delete" @onclick="@(() => HandleDeleteFile(file))">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Folder Modal -->
+    @if (showNewFolderModal)
+    {
+        <div class="modal-overlay" @onclick="@(() => showNewFolderModal = false)">
+            <div class="modal-content" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2>📁 Create New Folder</h2>
+                    <button class="modal-close" @onclick="@(() => showNewFolderModal = false)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="folder-name">Folder Name</label>
+                        <input type="text" id="folder-name" class="form-control" @bind="newFolderName" placeholder="Enter folder name" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="folder-description">Description (Optional)</label>
+                        <textarea id="folder-description" class="form-control" @bind="newFolderDescription" placeholder="Add a description" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Folder will be created at:</label>
+                        <div class="path-info">
+                            <code>@GetFullPath()</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="@(() => showNewFolderModal = false)">Cancel</button>
+                    <button class="btn btn-primary" @onclick="@(() => CreateNewFolder())">Create Folder</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<FolderModel> folderList = new();
+    private List<PathFolderModel> currentPath = new();
+    private List<FileModel> recentUploads = new();
+    private List<UploadingFileModel> uploadingFiles = new();
+    private int? selectedFolderId = null;
+    private string selectedFolderName = "";
+    private string selectedCategory = "";
+    private List<string> categories = new() { "Reports", "Contracts", "Invoices", "Presentations", "Other" };
+    private int? ActiveFileId = null;
+    private bool showNewFolderModal = false;
+    private string newFolderName = "";
+    private string newFolderDescription = "";
+    private double usedStorage = 24.5;
+    private double totalStorage = 100;
+    private double storagePercentage => (usedStorage / totalStorage) * 100;
+
+    protected override void OnInitialized()
+    {
+        // Initialize folders
+        folderList = new List<FolderModel>
+        {
+            new() { Id = 1, Name = "Reports", FileCount = 12, Description = "Annual and quarterly reports" },
+            new() { Id = 2, Name = "Contracts", FileCount = 8, Description = "Legal contracts and agreements" },
+            new() { Id = 3, Name = "Invoices", FileCount = 25, Description = "Customer and vendor invoices" },
+            new() { Id = 4, Name = "Presentations", FileCount = 5, Description = "Meeting and training presentations" },
+            new() { Id = 5, Name = "Archive", FileCount = 3, Description = "Old files and backups" }
+        };
+
+        // Initialize recent uploads
+        recentUploads = new List<FileModel>
+        {
+            new() { Id = 1, Name = "Q2 Financial Report.pdf", Type = "pdf", Size = "2.4 MB", UploadedDate = "2 hours ago", Category = "Reports", Status = "completed", FilePath = "My Documents\\Reports\\Q2 Financial Report.pdf" },
+            new() { Id = 2, Name = "Client Proposal.docx", Type = "word", Size = "1.2 MB", UploadedDate = "4 hours ago", Category = "Presentations", Status = "completed", FilePath = "My Documents\\Presentations\\Client Proposal.docx" },
+            new() { Id = 3, Name = "Invoice Data.xlsx", Type = "excel", Size = "856 KB", UploadedDate = "Today", Category = "Invoices", Status = "completed", FilePath = "My Documents\\Invoices\\Invoice Data.xlsx" },
+            new() { Id = 4, Name = "Service Agreement.pdf", Type = "pdf", Size = "512 KB", UploadedDate = "Yesterday", Category = "Contracts", Status = "completed", FilePath = "My Documents\\Contracts\\Service Agreement.pdf" },
+            new() { Id = 5, Name = "Budget Analysis.xlsx", Type = "excel", Size = "1.8 MB", UploadedDate = "2 days ago", Category = "Reports", Status = "processing", FilePath = "My Documents\\Reports\\Budget Analysis.xlsx" },
+            new() { Id = 6, Name = "Meeting Minutes.docx", Type = "word", Size = "542 KB", UploadedDate = "3 days ago", Category = "Reports", Status = "completed", FilePath = "My Documents\\Reports\\Meeting Minutes.docx" }
+        };
+    }
+
+    private void SelectFolder(int? folderId)
+    {
+        selectedFolderId = folderId;
+
+        if (folderId == null)
+        {
+            selectedFolderName = "Home";
+            currentPath.Clear();
+        }
+        else
+        {
+            var folder = folderList.FirstOrDefault(f => f.Id == folderId);
+            selectedFolderName = folder?.Name ?? "";
+
+            // Build path
+            currentPath.Clear();
+            currentPath.Add(new PathFolderModel { Id = folderId.Value, Name = folder?.Name ?? "" });
+        }
+    }
+
+    private string GetFullPath()
+    {
+        if (selectedFolderId == null)
+            return "My Documents";
+
+        var path = "My Documents";
+        foreach (var folder in currentPath)
+        {
+            path += $"\\{folder.Name}";
+        }
+        return path;
+    }
+
+    private void SelectCategory(string category)
+    {
+        selectedCategory = selectedCategory == category ? "" : category;
+    }
+
+    private void ChangeSortOrder(string sortOrder)
+    {
+        Console.WriteLine($"Sort by: {sortOrder}");
+    }
+
+    private void HandleFileDrop(DragEventArgs e)
+    {
+        Console.WriteLine("Files dropped");
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        e.DataTransfer.DropEffect = "copy";
+    }
+
+    private void HandleDragLeave(DragEventArgs e)
+    {
+        // Handle drag leave
+    }
+
+    private void HandleFileSelect(ChangeEventArgs e)
+    {
+        // Add to uploading files
+        var newUpload = new UploadingFileModel
+        {
+            Name = "Sample File.pdf",
+            Progress = 45,
+            Status = "Uploading...",
+            UploadPath = GetFullPath()
+        };
+        uploadingFiles.Add(newUpload);
+        Console.WriteLine("Files selected");
+    }
+
+    private void ShowNewFolderModal()
+    {
+        showNewFolderModal = true;
+    }
+
+    private void CreateNewFolder()
+    {
+        if (!string.IsNullOrEmpty(newFolderName))
+        {
+            var newFolder = new FolderModel
+            {
+                Id = folderList.Max(f => f.Id) + 1,
+                Name = newFolderName,
+                Description = newFolderDescription,
+                FileCount = 0
+            };
+            folderList.Add(newFolder);
+            newFolderName = "";
+            newFolderDescription = "";
+            showNewFolderModal = false;
+        }
+    }
+
+    private void CopyPathToClipboard()
+    {
+        Console.WriteLine($"Copied: {GetFullPath()}");
+    }
+
+    private void CopyFilePath(string filePath)
+    {
+        Console.WriteLine($"Copied: {filePath}");
+    }
+
+    private void HandleDownloadFile(FileModel file) => Console.WriteLine($"Downloading: {file.Name}");
+    private void HandleShareFile(FileModel file) => Console.WriteLine($"Sharing: {file.Name}");
+    private void HandleDeleteFile(FileModel file) => recentUploads.Remove(file);
+
+    private string GetFileIcon(string type) => type switch
+    {
+        "pdf" => "📄",
+        "word" => "📝",
+        "excel" => "📊",
+        "powerpoint" => "🎨",
+        "image" => "🖼️",
+        _ => "📁"
+    };
+
+    private string GetFileColor(string type) => type switch
+    {
+        "pdf" => "#d32f2f",
+        "word" => "#2196F3",
+        "excel" => "#1f7e3a",
+        "powerpoint" => "#f57c00",
+        "image" => "#9c27b0",
+        _ => "#666666"
+    };
+
+    private string GetCategoryIcon(string category) => category switch
+    {
+        "Reports" => "📊",
+        "Contracts" => "📋",
+        "Invoices" => "💰",
+        "Presentations" => "🎨",
+        "Other" => "📁",
+        _ => "📁"
+    };
+
+    public class FolderModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int FileCount { get; set; }
+    }
+
+    public class PathFolderModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class FileModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string Size { get; set; }
+        public string UploadedDate { get; set; }
+        public string Category { get; set; }
+        public string Status { get; set; }
+        public string FilePath { get; set; }
+    }
+
+    public class UploadingFileModel
+    {
+        public string Name { get; set; }
+        public int Progress { get; set; }
+        public string Status { get; set; }
+        public string UploadPath { get; set; }
+    }
+}
