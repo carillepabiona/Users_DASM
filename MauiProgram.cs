@@ -16,8 +16,19 @@ namespace Users_DASM
 
             builder.Services.AddMauiBlazorWebView();
 
+            // API CONNECTION
+            builder.Services.AddScoped(sp =>
+                new HttpClient
+                {
+                    BaseAddress =
+                        new Uri("http://192.168.254.102:5043/")
+                });
+
+            // SERVICES
+            // builder.Services.AddScoped<UserService>();
+
 #if DEBUG
-    		builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
 #endif
 
