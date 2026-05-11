@@ -119,7 +119,6 @@
 
     private async Task HandleLogin()
     {
-        // PERSONNEL APP
         loginModel.AppType = "Personnel";
 
         errorMessage = "";
@@ -137,19 +136,37 @@
 
                 if (user != null)
                 {
-                    // SAVE SESSION
+                    // SAVE USER SESSION
                     await JS.InvokeVoidAsync(
                         "localStorage.setItem",
                         "currentUser",
                         JsonSerializer.Serialize(user));
 
-                    // REDIRECT
+                    // SAVE USER LEVEL ACCESS
+                    await JS.InvokeVoidAsync(
+                        "localStorage.setItem",
+                        "userLevel",
+                        user.LevelAccess);
+
+                    // SAVE USER ID
+                    await JS.InvokeVoidAsync(
+                        "localStorage.setItem",
+                        "userId",
+                        user.Id.ToString());
+
+                    // SAVE USERNAME
+                    await JS.InvokeVoidAsync(
+                        "localStorage.setItem",
+                        "username",
+                        user.Username);
+
                     Nav.NavigateTo("/dashboard");
                 }
             }
             else
             {
-                errorMessage = await response.Content.ReadAsStringAsync();
+                errorMessage =
+                    await response.Content.ReadAsStringAsync();
             }
         }
         catch (Exception ex)

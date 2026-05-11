@@ -21,7 +21,7 @@ namespace Users_DASM
                 new HttpClient
                 {
                     BaseAddress =
-                        new Uri("http://192.168.254.102:5043/")
+                        new Uri("http://192.168.11.10:5043/")
                 });
 
             // SERVICES
