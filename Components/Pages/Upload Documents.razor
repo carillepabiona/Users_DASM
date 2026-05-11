@@ -663,11 +663,12 @@
                 UploadedDate = x.CreatedAt.ToString("MMM dd, yyyy"),
                 Category = x.Category,
                 FilePath = BuildDocumentPath(
-                    x.StoragePath,
-                    x.OriginalFileName),
+        x.StoragePath,
+        x.OriginalFileName),
                 Status = "completed",
                 UploadedBy = x.UploadedBy,
-                UserLevel = x.UserLevel
+                UserLevel = x.UserLevel,
+                FolderId = x.FolderId
             }).ToList();
 
             usedStorage =
@@ -1057,6 +1058,9 @@
         public string UploadedBy { get; set; }
 
         public string UserLevel { get; set; }
+
+        // IMPORTANT
+        public Guid? FolderId { get; set; }
     }
 
     public class UploadingFileModel
@@ -1105,5 +1109,8 @@
         public string UploadedBy { get; set; }
 
         public string UserLevel { get; set; }
+
+        // IMPORTANT
+        public Guid? FolderId { get; set; }
     }
 }
