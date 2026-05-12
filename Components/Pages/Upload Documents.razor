@@ -1,5 +1,6 @@
 ﻿@page "/upload-documents"
-
+@using Users_DASM.Services
+@inject DocumentStateService DocumentState
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
@@ -55,26 +56,6 @@
 
                     </div>
                 }
-
-            </div>
-
-            <div class="sidebar-footer">
-
-                <p class="storage-label">
-                    Storage Used
-                </p>
-
-                <div class="storage-bar">
-
-                    <div class="storage-progress"
-                         style="width:@storagePercentage%">
-                    </div>
-
-                </div>
-
-                <p class="storage-text">
-                    @usedStorage GB / @totalStorage GB
-                </p>
 
             </div>
 
@@ -250,174 +231,33 @@
 
             </div>
 
-            <!-- RECENT UPLOADS -->
-            <div class="recent-uploads-section">
+            <!-- SUCCESS MESSAGE -->
+            @if (!string.IsNullOrWhiteSpace(uploadSuccessMessage))
+            {
+                <div class="upload-success-box">
 
-                <div class="section-header">
-
-                    <h2>📋 Recent Uploads</h2>
-
-                    <select class="sort-dropdown"
-                            @onchange="@((ChangeEventArgs e) => ChangeSortOrder(e.Value?.ToString()))">
-
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="name">Name (A-Z)</option>
-                        <option value="size">Size (Largest)</option>
-
-                    </select>
-
-                </div>
-
-                <!-- UPLOADING -->
-                @if (uploadingFiles.Count > 0)
-                {
-                    <div class="upload-progress-section">
-
-                        @foreach (var uploadFile in uploadingFiles)
-                        {
-                            <div class="upload-progress-item">
-
-                                <div class="progress-info">
-
-                                    <p class="progress-filename">
-                                        @uploadFile.Name
-                                    </p>
-
-                                    <p class="progress-status">
-                                        @uploadFile.Status
-                                    </p>
-
-                                    <p class="progress-path">
-
-                                        <i class="fas fa-folder-open"></i>
-
-                                        @uploadFile.UploadPath
-
-                                    </p>
-
-                                </div>
-
-                                <div class="progress-bar">
-
-                                    <div class="progress-fill"
-                                         style="width:@uploadFile.Progress%">
-                                    </div>
-
-                                </div>
-
-                                <p class="progress-percentage">
-                                    @uploadFile.Progress%
-                                </p>
-
-                            </div>
-                        }
-
+                    <div class="success-icon">
+                        <i class="fas fa-check-circle"></i>
                     </div>
-                }
 
-                <!-- FILE LIST -->
-                <div class="files-list">
+                    <div class="success-details">
 
-                    @if (recentUploads.Count == 0)
-                    {
-                        <div class="empty-state">
+                        <h3>Upload Successful!</h3>
 
-                            <i class="fas fa-inbox"></i>
+                        <p>@uploadSuccessMessage</p>
 
-                            <p>No files uploaded yet</p>
+                        <div class="success-path">
+
+                            <i class="fas fa-folder-open"></i>
+
+                            <code>@lastUploadedPath</code>
 
                         </div>
-                    }
-                    else
-                    {
-                        @foreach (var file in recentUploads)
-                        {
-                            <div class="file-item"
-                                 @onmouseenter="@(() => ActiveFileId = file.Id)"
-                                 @onmouseleave="@(() => ActiveFileId = null)">
 
-                                <div class="file-left">
-
-                                    <div class="file-icon"
-                                         style="background-color:@GetFileColor(file.Type)">
-
-                                        @GetFileIcon(file.Type)
-
-                                    </div>
-
-                                    <div class="file-details">
-
-                                        <h4 class="file-name">
-                                            @file.Name
-                                        </h4>
-
-                                        <p class="file-meta">
-
-                                            @file.Size |
-                                            @file.UploadedDate
-
-                                            @if (!string.IsNullOrWhiteSpace(file.Category))
-                                            {
-                                                <span> | @file.Category</span>
-                                            }
-
-                                        </p>
-
-                                        <p class="file-path">
-
-                                            <i class="fas fa-folder-open"></i>
-
-                                            @file.FilePath
-
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
-                                <div class="file-status">
-
-                                    <span class="status-badge success">
-
-                                        <i class="fas fa-check-circle"></i>
-
-                                        Completed
-
-                                    </span>
-
-                                </div>
-
-                                @if (ActiveFileId == file.Id)
-                                {
-                                    <div class="file-actions">
-
-                                        <button class="action-btn"
-                                                title="Download"
-                                                @onclick="@(() => HandleDownloadFile(file))">
-
-                                            <i class="fas fa-download"></i>
-
-                                        </button>
-
-                                        <button class="action-btn delete"
-                                                title="Delete"
-                                                @onclick="@(() => HandleDeleteFile(file))">
-
-                                            <i class="fas fa-trash"></i>
-
-                                        </button>
-
-                                    </div>
-                                }
-
-                            </div>
-                        }
-                    }
+                    </div>
 
                 </div>
-
-            </div>
+            }
 
         </main>
 
@@ -555,16 +395,19 @@
 
 @code {
 
+    // ======================================
+    // CURRENT USER
+    // ======================================
+
+    private Guid currentUserId =
+        Guid.Parse("768EF2DB-A86B-47DB-AF9F-5CDEBB26F97E");
+
     [Inject]
     HttpClient Http { get; set; }
 
     private List<FolderModel> folderList = new();
 
     private List<PathFolderModel> currentPath = new();
-
-    private List<FileModel> recentUploads = new();
-
-    private List<UploadingFileModel> uploadingFiles = new();
 
     private List<CategoryModel> categories = new();
 
@@ -573,8 +416,6 @@
     private string selectedFolderName = "";
 
     private string selectedCategory = "";
-
-    private Guid? ActiveFileId = null;
 
     private bool showNewFolderModal = false;
 
@@ -585,6 +426,10 @@
     private string newCategoryName = "";
 
     private string newCategoryDescription = "";
+
+    private string uploadSuccessMessage = "";
+
+    private string lastUploadedPath = "";
 
     private double usedStorage = 0;
 
@@ -600,8 +445,6 @@
         await LoadFolders();
 
         await LoadCategories();
-
-        await LoadDocuments();
     }
 
     // ======================================
@@ -612,7 +455,7 @@
     {
         var response =
             await Http.GetFromJsonAsync<List<FolderResponse>>(
-                "http://192.168.11.10:5043/api/folders");
+                "api/folders");
 
         if (response != null)
         {
@@ -634,46 +477,11 @@
     {
         var response =
             await Http.GetFromJsonAsync<List<CategoryModel>>(
-                "http://192.168.11.10:5043/api/categories");
+                "api/categories");
 
         if (response != null)
         {
             categories = response;
-        }
-    }
-
-    // ======================================
-    // LOAD DOCUMENTS
-    // ======================================
-
-    private async Task LoadDocuments()
-    {
-        var response =
-            await Http.GetFromJsonAsync<List<DocumentResponse>>(
-                "http://192.168.11.10:5043/api/documents");
-
-        if (response != null)
-        {
-            recentUploads = response.Select(x => new FileModel
-            {
-                Id = x.Id,
-                Name = x.OriginalFileName,
-                Type = GetFileType(x.OriginalFileName),
-                Size = FormatFileSize(x.FileSize),
-                UploadedDate = x.CreatedAt.ToString("MMM dd, yyyy"),
-                Category = x.Category,
-                FilePath = BuildDocumentPath(
-        x.StoragePath,
-        x.OriginalFileName),
-                Status = "completed",
-                UploadedBy = x.UploadedBy,
-                UserLevel = x.UserLevel,
-                FolderId = x.FolderId
-            }).ToList();
-
-            usedStorage =
-                response.Sum(x => x.FileSize)
-                / 1024d / 1024d / 1024d;
         }
     }
 
@@ -704,13 +512,8 @@
 
             var response =
                 await Http.PostAsJsonAsync(
-                    "http://192.168.11.10:5043/api/categories",
+                    "api/categories",
                     request);
-
-            var message =
-                await response.Content.ReadAsStringAsync();
-
-            Console.WriteLine(message);
 
             if (response.IsSuccessStatusCode)
             {
@@ -749,7 +552,7 @@
 
         var response =
             await Http.PostAsJsonAsync(
-                "http://192.168.11.10:5043/api/folders",
+                "api/folders",
                 request);
 
         if (response.IsSuccessStatusCode)
@@ -833,44 +636,8 @@
         return path;
     }
 
-    private string BuildDocumentPath(
-    string storagePath,
-    string fileName)
-    {
-        if (string.IsNullOrWhiteSpace(storagePath))
-        {
-            return $"My Documents\\{fileName}";
-        }
-
-        storagePath =
-            storagePath.Replace("/", "\\");
-
-        if (!storagePath.StartsWith("My Documents"))
-        {
-            storagePath = $"My Documents\\{storagePath}";
-        }
-
-        return $"{storagePath}\\{fileName}";
-    }
-
     private void CopyPathToClipboard()
     {
-    }
-
-    private void ChangeSortOrder(string sortOrder)
-    {
-    }
-
-    private void HandleDownloadFile(FileModel file)
-    {
-    }
-
-    private async Task HandleDeleteFile(FileModel file)
-    {
-        await Http.DeleteAsync(
-            $"http://192.168.11.10:5043/api/documents/{file.Id}");
-
-        await LoadDocuments();
     }
 
     // ======================================
@@ -880,21 +647,14 @@
     private async Task HandleFileSelect(
         InputFileChangeEventArgs e)
     {
+        uploadSuccessMessage = "";
+
+        lastUploadedPath = "";
+
         var files = e.GetMultipleFiles();
 
         foreach (var file in files)
         {
-            var upload =
-                new UploadingFileModel
-                {
-                    Name = file.Name,
-                    Progress = 10,
-                    Status = "Preparing...",
-                    UploadPath = GetFullPath()
-                };
-
-            uploadingFiles.Add(upload);
-
             var content =
                 new MultipartFormDataContent();
 
@@ -912,7 +672,7 @@
                 file.Name);
 
             content.Add(
-                new StringContent(selectedCategory),
+                new StringContent(selectedCategory ?? ""),
                 "category");
 
             if (selectedFolderId != null)
@@ -928,30 +688,25 @@
                     "9136564a-c20f-4208-86a3-22d665c8df56"),
                 "uploadedBy");
 
-            upload.Progress = 50;
-
-            upload.Status = "Uploading...";
-
             var response =
                 await Http.PostAsync(
-                    "http://192.168.11.10:5043/api/documents/upload",
+                    "api/documents/upload",
                     content);
 
             if (response.IsSuccessStatusCode)
             {
-                upload.Progress = 100;
+                lastUploadedPath =
+                    $"{GetFullPath()}\\{file.Name}";
 
-                upload.Status = "Completed";
-
-                await LoadDocuments();
+                uploadSuccessMessage =
+                    $"The document '{file.Name}' was uploaded successfully.";
 
                 await LoadFolders();
             }
             else
             {
-                upload.Progress = 0;
-
-                upload.Status = "Failed";
+                uploadSuccessMessage =
+                    $"Failed to upload '{file.Name}'.";
             }
         }
     }
@@ -959,52 +714,6 @@
     // ======================================
     // FILE HELPERS
     // ======================================
-
-    private string GetFileType(string fileName)
-    {
-        var ext =
-            Path.GetExtension(fileName).ToLower();
-
-        return ext switch
-        {
-            ".pdf" => "pdf",
-            ".doc" or ".docx" => "word",
-            ".xls" or ".xlsx" => "excel",
-            ".ppt" or ".pptx" => "powerpoint",
-            ".png" or ".jpg" or ".jpeg" => "image",
-            _ => "file"
-        };
-    }
-
-    private string FormatFileSize(long bytes)
-    {
-        if (bytes >= 1024 * 1024)
-        {
-            return $"{bytes / 1024f / 1024f:0.##} MB";
-        }
-
-        return $"{bytes / 1024f:0.##} KB";
-    }
-
-    private string GetFileIcon(string type) => type switch
-    {
-        "pdf" => "📄",
-        "word" => "📝",
-        "excel" => "📊",
-        "powerpoint" => "🎨",
-        "image" => "🖼️",
-        _ => "📁"
-    };
-
-    private string GetFileColor(string type) => type switch
-    {
-        "pdf" => "#d32f2f",
-        "word" => "#2196F3",
-        "excel" => "#1f7e3a",
-        "powerpoint" => "#f57c00",
-        "image" => "#9c27b0",
-        _ => "#666666"
-    };
 
     private string GetCategoryIcon(string category) => category switch
     {
@@ -1037,43 +746,6 @@
         public string Name { get; set; }
     }
 
-    public class FileModel
-    {
-        public Guid Id { get; set; }
-
-        public string Name { get; set; }
-
-        public string Type { get; set; }
-
-        public string Size { get; set; }
-
-        public string UploadedDate { get; set; }
-
-        public string Category { get; set; }
-
-        public string Status { get; set; }
-
-        public string FilePath { get; set; }
-
-        public string UploadedBy { get; set; }
-
-        public string UserLevel { get; set; }
-
-        // IMPORTANT
-        public Guid? FolderId { get; set; }
-    }
-
-    public class UploadingFileModel
-    {
-        public string Name { get; set; }
-
-        public int Progress { get; set; }
-
-        public string Status { get; set; }
-
-        public string UploadPath { get; set; }
-    }
-
     public class FolderResponse
     {
         public Guid Id { get; set; }
@@ -1090,27 +762,5 @@
         public Guid Id { get; set; }
 
         public string Name { get; set; }
-    }
-
-    public class DocumentResponse
-    {
-        public Guid Id { get; set; }
-
-        public string OriginalFileName { get; set; }
-
-        public long FileSize { get; set; }
-
-        public string StoragePath { get; set; }
-
-        public DateTime CreatedAt { get; set; }
-
-        public string Category { get; set; }
-
-        public string UploadedBy { get; set; }
-
-        public string UserLevel { get; set; }
-
-        // IMPORTANT
-        public Guid? FolderId { get; set; }
     }
 }
