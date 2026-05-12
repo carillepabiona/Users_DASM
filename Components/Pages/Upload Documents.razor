@@ -1,6 +1,7 @@
 ﻿@page "/upload-documents"
 @using Users_DASM.Services
 @inject DocumentStateService DocumentState
+@inject CurrentUserService CurrentUserService
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
@@ -399,8 +400,9 @@
     // CURRENT USER
     // ======================================
 
-    private Guid currentUserId =
-        Guid.Parse("768EF2DB-A86B-47DB-AF9F-5CDEBB26F97E");
+    private Guid currentUserId;
+
+    private UserSession? currentUser;
 
     [Inject]
     HttpClient Http { get; set; }
@@ -442,6 +444,24 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // ============================
+        // GET CURRENT USER
+        // ============================
+
+        currentUser =
+            await CurrentUserService.GetUser();
+
+        if (currentUser == null)
+        {
+            return;
+        }
+
+        currentUserId = currentUser.Id;
+
+        // ============================
+        // LOAD PAGE DATA
+        // ============================
+
         await LoadFolders();
 
         await LoadCategories();
@@ -547,7 +567,7 @@
         {
             Name = newFolderName,
             ParentFolderId = selectedFolderId,
-            CreatedBy = "9136564a-c20f-4208-86a3-22d665c8df56"
+            CreatedBy = currentUserId
         };
 
         var response =
@@ -683,10 +703,10 @@
                     "folderId");
             }
 
-            content.Add(
-                new StringContent(
-                    "9136564a-c20f-4208-86a3-22d665c8df56"),
-                "uploadedBy");
+                content.Add(
+                     new StringContent(
+                         currentUserId.ToString()),
+                     "uploadedBy");
 
             var response =
                 await Http.PostAsync(
