@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Users_DASM.Services;
+using Blazored.LocalStorage;
 
 namespace Users_DASM
 {
@@ -27,6 +28,8 @@ namespace Users_DASM
 
             // SERVICES
             builder.Services.AddSingleton<DocumentStateService>();
+            builder.Services.AddBlazoredLocalStorage();
+            builder.Services.AddScoped<CurrentUserService>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();

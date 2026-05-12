@@ -4,7 +4,9 @@
 @using System.Net.Http.Json
 @using System.Text.Json
 @using Microsoft.JSInterop
+@using Users_DASM.Services
 
+@inject CurrentUserService CurrentUserService
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -109,7 +111,15 @@
 
 @code {
 
+    // =========================================
+    // LOGIN MODEL
+    // =========================================
+
     private LoginRequest loginModel = new();
+
+    // =========================================
+    // UI
+    // =========================================
 
     private string errorMessage = "";
 
@@ -117,56 +127,53 @@
 
     private string passwordIcon = "fas fa-eye";
 
+    // =========================================
+    // LOGIN
+    // =========================================
+
     private async Task HandleLogin()
     {
-        loginModel.AppType = "Personnel";
-
         errorMessage = "";
+
+        loginModel.AppType = "Personnel";
 
         try
         {
-            var response = await Http.PostAsJsonAsync(
-                "api/auth/login",
-                loginModel);
+            var response =
+                await Http.PostAsJsonAsync(
+                    "api/auth/login",
+                    loginModel);
+
+            // =====================================
+            // SUCCESS
+            // =====================================
 
             if (response.IsSuccessStatusCode)
             {
-                var user = await response.Content
+                var user =
+                    await response.Content
                     .ReadFromJsonAsync<UserSession>();
 
                 if (user != null)
                 {
                     // SAVE USER SESSION
-                    await JS.InvokeVoidAsync(
-                        "localStorage.setItem",
-                        "currentUser",
-                        JsonSerializer.Serialize(user));
+                    await CurrentUserService
+                        .SaveUser(user);
 
-                    // SAVE USER LEVEL ACCESS
-                    await JS.InvokeVoidAsync(
-                        "localStorage.setItem",
-                        "userLevel",
-                        user.LevelAccess);
-
-                    // SAVE USER ID
-                    await JS.InvokeVoidAsync(
-                        "localStorage.setItem",
-                        "userId",
-                        user.Id.ToString());
-
-                    // SAVE USERNAME
-                    await JS.InvokeVoidAsync(
-                        "localStorage.setItem",
-                        "username",
-                        user.Username);
-
-                    Nav.NavigateTo("/dashboard");
+                    // REDIRECT
+                    Nav.NavigateTo("/documents");
                 }
             }
+
+            // =====================================
+            // ERROR
+            // =====================================
+
             else
             {
                 errorMessage =
-                    await response.Content.ReadAsStringAsync();
+                    await response.Content
+                    .ReadAsStringAsync();
             }
         }
         catch (Exception ex)
@@ -175,30 +182,36 @@
         }
     }
 
+    // =========================================
+    // TOGGLE PASSWORD
+    // =========================================
+
     private void TogglePassword()
     {
         if (passwordInputType == "password")
         {
             passwordInputType = "text";
+
             passwordIcon = "fas fa-eye-slash";
         }
         else
         {
             passwordInputType = "password";
+
             passwordIcon = "fas fa-eye";
         }
     }
 
+    // =========================================
     // LOGIN REQUEST
+    // =========================================
+
     public class LoginRequest
     {
         public string Username { get; set; } = "";
 
         public string Password { get; set; } = "";
 
-        // Admin or Personnel
         public string AppType { get; set; } = "";
     }
-
-   
 }
