@@ -39,7 +39,7 @@ public partial class App : Application
             AppWindowHolder.Instance.Set(appWindow);
 
             int loginWidth = 650;
-            int loginHeight = 720;
+            int loginHeight = 550;
 
             // =========================
             // LOGIN WINDOW SIZE

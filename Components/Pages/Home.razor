@@ -19,7 +19,8 @@
     <!-- CLOSE BUTTON -->
     <button type="button"
             class="close-btn"
-            title="Close">
+            title="Close"
+            @onclick="CloseApp">
 
         <i class="fas fa-times"></i>
 
@@ -203,6 +204,19 @@ AppWindowHolder.Instance.RestoreFullWindow();
 
             passwordIcon = "fas fa-eye";
         }
+    }
+
+    // =========================================
+    // CLOSE APPLICATION
+    // =========================================
+
+    private async Task CloseApp()
+    {
+#if WINDOWS
+    System.Diagnostics.Process.GetCurrentProcess().Kill();
+#else
+        await JS.InvokeVoidAsync("close");
+#endif
     }
 
     // =========================================
